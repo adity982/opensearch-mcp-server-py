@@ -70,7 +70,7 @@ async def test_real_local_spec_download(monkeypatch, stall):
     try:
         await asyncio.wait_for(entered.wait(), 5)
         if stall:
-            with pytest.raises(TimeoutError):
+            with pytest.raises(asyncio.TimeoutError):
                 await asyncio.wait_for(asyncio.shield(task), 2)
             # A timeout from the outer safety guard leaves the shielded request
             # pending. Only the actual client deadline completes the task.
@@ -81,14 +81,14 @@ async def test_real_local_spec_download(monkeypatch, stall):
         release.set()
         if not task.done():
             task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
             await task
         await runner.cleanup()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'error', [TimeoutError('download timed out'), aiohttp.ClientError('offline')]
+    'error', [asyncio.TimeoutError('download timed out'), aiohttp.ClientError('offline')]
 )
 async def test_failed_generation_preserves_builtins_without_stdout(
     monkeypatch, capsys, caplog, error
