@@ -108,6 +108,33 @@ async def test_failed_generation_preserves_builtins_without_stdout(
 
 
 @pytest.mark.asyncio
+async def test_later_spec_failure_does_not_publish_partial_tools(monkeypatch, caplog):
+    """Generated tools become visible only after every specification succeeds."""
+    registry = {'ListIndexTool': {'display_name': 'ListIndexTool'}}
+    first_spec = {
+        'paths': {
+            '/_cluster/health': {
+                'get': {
+                    'x-operation-group': 'cluster.health',
+                    'description': 'Check cluster health',
+                }
+            }
+        }
+    }
+    fetch = AsyncMock(side_effect=[first_spec, aiohttp.ClientError('offline')])
+    monkeypatch.setattr(tool_generator, 'TOOL_REGISTRY', registry)
+    monkeypatch.setattr(tool_generator, 'fetch_github_spec', fetch)
+
+    with caplog.at_level(logging.WARNING, logger=tool_generator.__name__):
+        result = await tool_generator.generate_tools_from_openapi()
+
+    assert result is registry
+    assert registry == {'ListIndexTool': {'display_name': 'ListIndexTool'}}
+    assert fetch.await_count == 2
+    assert 'ClientError' in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_generation_cancellation_propagates(monkeypatch, capsys):
     """Cancellation is not swallowed as an optional-download failure."""
     monkeypatch.setattr(

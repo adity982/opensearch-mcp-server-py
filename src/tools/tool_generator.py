@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import aiohttp
+import asyncio
 import json
 import logging
 import os
@@ -304,6 +305,7 @@ def generate_tool_from_group(base_name: str, endpoints: List[Dict]) -> Dict[str,
 
 async def generate_tools_from_openapi() -> Dict[str, Dict[str, Any]]:
     """Generate tools from OpenSearch API specification and append to TOOL_REGISTRY."""
+    generated_tools = {}
     try:
         for spec_file in SPEC_FILES:
             spec = await fetch_github_spec(spec_file)
@@ -312,9 +314,13 @@ async def generate_tools_from_openapi() -> Dict[str, Dict[str, Any]]:
             for group_name, endpoints in grouped_ops.items():
                 base_name = ''.join(part.title() for part in group_name.split('.'))
                 tool_name = f'{base_name.replace("_", "")}Tool'
-                TOOL_REGISTRY[tool_name] = generate_tool_from_group(base_name, endpoints)
+                generated_tools[tool_name] = generate_tool_from_group(base_name, endpoints)
 
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         logger.warning('OpenAPI tool generation failed (%s): %s', type(e).__name__, e)
+    else:
+        TOOL_REGISTRY.update(generated_tools)
 
     return TOOL_REGISTRY
